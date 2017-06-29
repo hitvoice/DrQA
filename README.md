@@ -52,9 +52,9 @@ python train.py -e 20 -bs 32
 
 Compared to the implementation in ParlAI:
 
-<img src="img/em.svg" width="500">
+<img src="https://rawgit.com/hitvoice/DrQA/master/img/em.svg" width="500">
 
-<img src="img/f1.svg" width="500">
+<img src="https://rawgit.com/hitvoice/DrQA/master/img/f1.svg" width="500">
 
 The command to run the ParlAI implementation:
 ```bash
@@ -102,7 +102,7 @@ So what's the difference between most frequent words and most frequent question 
 
 The venn diagram:
 
-<img src="img/vocab.svg" width="500">
+<img src="https://rawgit.com/hitvoice/DrQA/master/img/vocab.svg" width="500">
 
 26% words are different in top 1000 words of the two vocabularies. When finetuning 1000 most frequent question words instead of 1000 most frequent words, about 1.5% boost of F1 score is observed.
 
