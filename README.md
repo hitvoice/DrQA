@@ -3,14 +3,14 @@ DrQA
 
 A pytorch implementation of [Reading Wikipedia to Answer Open-Domain Questions](http://www-cs.stanford.edu/people/danqi/papers/acl2017.pdf) (DrQA).
 
-Reading comprehension is a task to produce an answer when given a question and one or more evidences (usually natural language paragraphs). Compared to question answering over knowledge bases, reading comprehension models are more flexible and have revealed great potential for zero-shot learning (e.g. [Zero-Shot Relation Extraction via Reading Comprehension](https://arxiv.org/abs/1706.04115)).
+Reading comprehension is a task to produce an answer when given a question and one or more pieces of evidence (usually natural language paragraphs). Compared to question answering over knowledge bases, reading comprehension models are more flexible and have revealed a great potential for zero-shot learning (e.g. [Zero-Shot Relation Extraction via Reading Comprehension](https://arxiv.org/abs/1706.04115)).
 
-[SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) is a reading comprehension benchmark where there's only a singe evidence and the answer is guaranteed to be a part of the evidence. Since the publication of SQuAD dataset, there has been fast progress in the research of reading comprehension and a bunch of great models have come out. DrQA is one that is conceptually simpler than most others, but still yields strong performance even as a single model.
+[SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) is a reading comprehension benchmark where there's only a single piece of evidence and the answer is guaranteed to be a part of the evidence. Since the publication of SQuAD dataset, there has been fast progress in the research of reading comprehension and a bunch of great models have come out. DrQA is one that is conceptually simpler than most others but still yields strong performance even as a single model.
 
 The motivation for this project is to offer a clean version of DrQA for the machine reading comprehension task, so one can quickly do some modifications and try out new ideas. Most of the model code is borrowed from [Facebook/ParlAI](https://github.com/facebookresearch/ParlAI/). Compared to the code in ParlAI, the major differences are:
 - The DrQA model is not longer wrapped in a chatbot framework, which makes the code more readable, easier to modify and is faster to train. The preprocessing for text corpus is performed only once, while in a dialog framework raw text is transmitted each time and preprocessing for the same text must be done again and again.
 - This is a full implementation of the original paper, while the model in ParlAI is a partial implementation, missing all grammatical features (lemma, POS tags and named entity tags). 
-- When finetuning top-k embeddings, the model will finetune the embeddings of top-k question words as the original paper states, while the word dictionary in ParlAI is sorted by the frequency of all words. This does make a difference (see the discussion below).
+- When tuning top-k embeddings, the model will tune the embeddings of top-k question words as the original paper states, while the word dictionary in ParlAI is sorted by the frequency of all words. This does make a difference (see the discussion below).
 - Some minor bug fixing and enhancements (which may also appear in ParlAI in the future): pad with <\_\_NULL\_\_> instead of <\_\_UNK\_\_>, get exact answer location instead of searching with text and selecting randomly from the matches, save and resume with optimizer state dict, etc.
 
 The differences compared with original paper:
@@ -73,7 +73,7 @@ The experiments are run on a machine with a single NVIDIA Tesla K80 GPU, 8 CPUs 
 
 ### related discussions
 Here's what the paper says when introducing the embedding layer:
-> We keep most of the pre-trained word embeddings fixed and only fine-tune the 1000 **most frequent question words** because the representations of some key words such as *what*, *how*, *which*, *many* could be crucial for QA systems.
+> We keep most of the pre-trained word embeddings fixed and only fine-tune the 1000 **most frequent question words** because the representations of some keywords such as *what*, *how*, *which*, *many* could be crucial for QA systems.
 
 So what's the difference between most frequent words and most frequent question words? Here are the top 20 words of each:
 
@@ -104,10 +104,9 @@ The venn diagram:
 
 <img src="https://rawgit.com/hitvoice/DrQA/master/img/vocab.svg" width="500">
 
-26% words are different in top 1000 words of the two vocabularies. When finetuning 1000 most frequent question words instead of 1000 most frequent words, about 1.5% boost of F1 score is observed.
+26% words are different in top 1000 words of the two vocabularies. When tuning 1000 most frequent question words instead of 1000 most frequent words, about 1.5% boost of the F1 score is observed.
 
 ### Author
-The author of this project is [Runqi Yang](https://hitvoice.github.io/page/about/). Thanks Jun Yang for code review and advice.
+The author of this project is [Runqi Yang](https://hitvoice.github.io/page/about/). Thanks to Jun Yang for code review and advice.
 
 Most of the pytorch model code is borrowed from [Facebook/ParlAI](https://github.com/facebookresearch/ParlAI/) under a BSD-3 license.
-
