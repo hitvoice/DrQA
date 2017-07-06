@@ -27,6 +27,8 @@ parser.add_argument('--sample_size', type=int, default=0,
                     help='size of sample data (for debugging).')
 parser.add_argument('--threads', type=int, default=multiprocessing.cpu_count(),
                     help='number of threads for preprocessing.')
+parser.add_argument('--batch_size', type=int, default=64,
+                    help='batch size for multiprocess tokenizing and tagging.')
 
 args = parser.parse_args()
 trn_file = 'SQuAD/train-v1.1.json'
@@ -45,35 +47,46 @@ def normalize_text(text):
     return unicodedata.normalize('NFD', text)
 
 
-def load_glove_vocab(file):
+def load_wv_vocab(file):
+    '''Load tokens from word vector file.
+
+    Only tokens are loaded. Vectors are not loaded at this time for space efficiency.
+
+    Args:
+        file (str): path of pretrained word vector file.
+
+    Returns:
+        set: a set of tokens (str) contained in the word vector file.
+    '''
     vocab = set()
     with open(file) as f:
         for line in f:
             elems = line.split()
-            token = normalize_text(''.join(elems[0:-wv_dim]))
+            token = normalize_text(''.join(elems[0:-wv_dim]))  # a token may contain space
             vocab.add(token)
     return vocab
-glove_vocab = load_glove_vocab(wv_file)
+wv_vocab = load_wv_vocab(wv_file)
 log.info('glove loaded.')
 
 
 def flatten_json(file, proc_func):
+    '''A multi-processing wrapper for loading SQuAD data file.'''
     with open(file) as f:
         data = json.load(f)['data']
-    with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+    with ProcessPoolExecutor(max_workers=args.threads) as executor:
         rows = executor.map(proc_func, data)
     rows = sum(rows, [])
     return rows
 
 
 def proc_train(article):
+    '''Flatten each article in training data.'''
     rows = []
     for paragraph in article['paragraphs']:
         context = paragraph['context']
         for qa in paragraph['qas']:
             id_, question, answers = qa['id'], qa['question'], qa['answers']
-            assert len(answers) == 1
-            answer = answers[0]['text']
+            answer = answers[0]['text']  # in training data there's only one answer
             answer_start = answers[0]['answer_start']
             answer_end = answer_start + len(answer)
             rows.append((id_, context, question, answer, answer_start, answer_end))
@@ -81,6 +94,7 @@ def proc_train(article):
 
 
 def proc_dev(article):
+    '''Flatten each article in dev data'''
     rows = []
     for paragraph in article['paragraphs']:
         context = paragraph['context']
@@ -102,16 +116,29 @@ nlp = spacy.load('en', parser=False, tagger=False, entity=False)
 
 
 def pre_proc(text):
-    # make spaces clean
+    '''normalize spaces in a string.'''
     text = re.sub('\s+', ' ', text)
     return text
 context_iter = (pre_proc(c) for c in train.context)
 context_tokens = [[w.text for w in doc] for doc in nlp.pipe(
-    context_iter, batch_size=64, n_threads=multiprocessing.cpu_count())]
+    context_iter, batch_size=args.batch_size, n_threads=args.threads)]
 log.info('got intial tokens.')
 
 
-def get_answer_index(context, answer, context_token, answer_start, answer_end):
+def get_answer_index(context, context_token, answer_start, answer_end):
+    '''
+    Get exact indices of the answer in the tokens of the passage,
+    according to the start and end position of the answer.
+
+    Args:
+        context (str): the context passage
+        context_token (list): list of tokens (str) in the context passage
+        answer_start (int): the start position of the answer in the passage
+        answer_end (int): the end position of the answer in the passage
+
+    Returns:
+        (int, int): start index and end index of answer
+    '''
     p_str = 0
     p_token = 0
     while p_str < len(context):
@@ -148,9 +175,9 @@ nlp = spacy.load('en')
 context_text = [pre_proc(c) for c in contexts]
 question_text = [pre_proc(q) for q in questions]
 question_docs = [doc for doc in nlp.pipe(
-    iter(question_text), batch_size=64, n_threads=multiprocessing.cpu_count())]
+    iter(question_text), batch_size=args.batch_size, n_threads=args.threads)]
 context_docs = [doc for doc in nlp.pipe(
-    iter(context_text), batch_size=64, n_threads=multiprocessing.cpu_count())]
+    iter(context_text), batch_size=args.batch_size, n_threads=args.threads)]
 if args.wv_cased:
     question_tokens = [[normalize_text(w.text) for w in doc] for doc in question_docs]
     context_tokens = [[normalize_text(w.text) for w in doc] for doc in context_docs]
@@ -173,15 +200,19 @@ log.info('tokens generated')
 
 
 def build_vocab(questions, contexts):
+    '''
+    Build vocabulary sorted by global word frequency, or consider frequencies in questions first,
+    which is controlled by `args.sort_all`.
+    '''
     if args.sort_all:
         counter = collections.Counter(w for doc in questions + contexts for w in doc)
-        vocab = sorted([t for t in counter if t in glove_vocab], key=counter.get, reverse=True)
+        vocab = sorted([t for t in counter if t in wv_vocab], key=counter.get, reverse=True)
     else:
         counter_q = collections.Counter(w for doc in questions for w in doc)
         counter_c = collections.Counter(w for doc in contexts for w in doc)
         counter = counter_c + counter_q
-        vocab = sorted([t for t in counter_q if t in glove_vocab], key=counter_q.get, reverse=True)
-        vocab += sorted([t for t in counter_c.keys() - counter_q.keys() if t in glove_vocab],
+        vocab = sorted([t for t in counter_q if t in wv_vocab], key=counter_q.get, reverse=True)
+        vocab += sorted([t for t in counter_c.keys() - counter_q.keys() if t in wv_vocab],
                         key=counter.get, reverse=True)
     total = sum(counter.values())
     matched = sum(counter[t] for t in vocab)
