@@ -160,12 +160,12 @@ def get_answer_index(context, context_token, answer_start, answer_end):
         p_token += 1
     return (None, None)
 train['answer_start_token'], train['answer_end_token'] = \
-    zip(*[get_answer_index(a, b, c, d, e) for a, b, c, d, e in
-          zip(train.context, train.answer, context_tokens,
+    zip(*[get_answer_index(a, b, c, d) for a, b, c, d in
+          zip(train.context, context_tokens,
               train.answer_start, train.answer_end)])
 initial_len = len(train)
 train.dropna(inplace=True)
-log.info('drop {} inconsistent samples.'.format(len(train) - initial_len))
+log.info('drop {} inconsistent samples.'.format(initial_len - len(train)))
 log.info('answer pointer generated.')
 
 questions = list(train.question) + list(dev.question)
@@ -216,7 +216,7 @@ def build_vocab(questions, contexts):
                         key=counter.get, reverse=True)
     total = sum(counter.values())
     matched = sum(counter[t] for t in vocab)
-    log.info('vocab {1}/{0} OOV {2}/{3} ({4:.4f}%)'.format(
+    log.info('vocab coverage {1}/{0} | OOV occurrence {2}/{3} ({4:.4f}%)'.format(
         len(counter), len(vocab), (total - matched), total, (total - matched) / total * 100))
     vocab.insert(0, "<PAD>")
     vocab.insert(1, "<UNK>")
@@ -245,6 +245,7 @@ context_tag_ids = token2id(context_tags, vocab_tag)
 # entities, build dict on the fly
 counter_ent = collections.Counter(w for doc in context_ents for w in doc)
 vocab_ent = sorted(counter_ent, key=counter_ent.get, reverse=True)
+log.info('Found {} POS tags.'.format(len(vocab_tag)))
 log.info('Found {} entity tags: {}'.format(len(vocab_ent), vocab_ent))
 context_ent_ids = token2id(context_ents, vocab_ent)
 log.info('vocab built.')
