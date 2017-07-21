@@ -170,7 +170,7 @@ def main():
             if f1 > best_val_score:
                 best_val_score = f1
                 copyfile(
-                    os.path.join(model_dir, model_file),
+                    model_file,
                     os.path.join(model_dir, 'best_model.pt'))
                 log.info('[new best model saved.]')
 
@@ -230,9 +230,7 @@ class BatchGen:
         self.batch_size = batch_size
         self.eval = evaluation
         self.gpu = gpu
-        # sort by len
-        # if not evaluation:
-        #     data = sorted(data, key=lambda x:len(x[0]))
+
         # shuffle
         if not evaluation:
             indices = list(range(len(data)))
