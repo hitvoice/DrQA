@@ -20,7 +20,7 @@ The differences compared with the original paper:
 
 ## Requirements
 - python 3
-- pytorch 0.1.12 
+- pytorch 0.1.12
 - numpy
 - pandas
 - msgpack
@@ -30,7 +30,7 @@ The differences compared with the original paper:
 ### Setup
 - download the project via `git clone https://github.com/hitvoice/DrQA.git; cd DrQA`
 - make sure python 3 and pip is installed.
-- install [pytorch](http://pytorch.org/) matched with your OS, python and cuda versions.
+- install [pytorch](http://pytorch.org/) 0.1.12 matched with your OS, python and cuda versions (the newest version of pytorch is 0.2.0, so pay attention! Supporting for pytorch 0.2.0 will be available soon).
 - install the remaining requirements via `pip install -r requirements.txt`
 - download the SQuAD datafile, GloVe word vectors and Spacy English language models using `bash download.sh`.
 
