@@ -12,6 +12,7 @@ import torch
 import msgpack
 import pandas as pd
 from drqa.model import DocReaderModel
+from drqa.utils import str2bool
 
 parser = argparse.ArgumentParser(
     description='Train a Document Reader model.'
@@ -28,13 +29,14 @@ parser.add_argument('--model_dir', default='models',
 parser.add_argument('--save_last_only', action='store_true',
                     help='only save the final models.')
 parser.add_argument('--eval_per_epoch', type=int, default=1,
-                    help='perform evaluation per x epoches.')
+                    help='perform evaluation per x epochs.')
 parser.add_argument('--seed', type=int, default=411,
                     help='random seed for data shuffling, dropout, etc.')
-parser.add_argument('--cuda', type=bool, default=torch.cuda.is_available(),
+parser.add_argument("--cuda", type=str2bool, nargs='?',
+                    const=True, default=torch.cuda.is_available(),
                     help='whether to use GPU acceleration.')
 # training
-parser.add_argument('-e', '--epoches', type=int, default=20)
+parser.add_argument('-e', '--epochs', type=int, default=20)
 parser.add_argument('-bs', '--batch_size', type=int, default=32)
 parser.add_argument('-rs', '--resume', default='',
                     help='previous model file name (in `model_dir`). '
@@ -63,21 +65,25 @@ parser.add_argument('--doc_layers', type=int, default=3)
 parser.add_argument('--question_layers', type=int, default=3)
 parser.add_argument('--hidden_size', type=int, default=128)
 parser.add_argument('--num_features', type=int, default=4)
-parser.add_argument('--pos', type=bool, default=True)
+parser.add_argument('--pos', type=str2bool, nargs='?', const=True, default=True,
+                    help='use pos tags as a feature.')
 parser.add_argument('--pos_size', type=int, default=56,
                     help='how many kinds of POS tags.')
 parser.add_argument('--pos_dim', type=int, default=12,
                     help='the embedding dimension for POS tags.')
-parser.add_argument('--ner', type=bool, default=True)
+parser.add_argument('--ner', type=str2bool, nargs='?', const=True, default=True,
+                    help='use named entity tags as a feature.')
 parser.add_argument('--ner_size', type=int, default=19,
                     help='how many kinds of named entity tags.')
 parser.add_argument('--ner_dim', type=int, default=8,
                     help='the embedding dimension for named entity tags.')
-parser.add_argument('--use_qemb', type=bool, default=True)
-parser.add_argument('--concat_rnn_layers', type=bool, default=True)
+parser.add_argument('--use_qemb', type=str2bool, nargs='?', const=True, default=True)
+parser.add_argument('--concat_rnn_layers', type=str2bool, nargs='?',
+                    const=True, default=True)
 parser.add_argument('--dropout_emb', type=float, default=0.3)
 parser.add_argument('--dropout_rnn', type=float, default=0.3)
-parser.add_argument('--dropout_rnn_output', type=bool, default=True)
+parser.add_argument('--dropout_rnn_output', type=str2bool, nargs='?',
+                    const=True, default=True)
 parser.add_argument('--max_len', type=int, default=15)
 parser.add_argument('--rnn_type', default='lstm',
                     help='supported types: rnn, gru, lstm')
@@ -144,7 +150,7 @@ def main():
     else:
         best_val_score = 0.0
 
-    for epoch in range(epoch_0, epoch_0 + args.epoches):
+    for epoch in range(epoch_0, epoch_0 + args.epochs):
         log.warn('Epoch {}'.format(epoch))
         # train
         batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
@@ -164,7 +170,7 @@ def main():
             em, f1 = score(predictions, dev_y)
             log.warn("dev EM: {} F1: {}".format(em, f1))
         # save
-        if not args.save_last_only or epoch == epoch_0 + args.epoches - 1:
+        if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
             model_file = os.path.join(model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
             model.save(model_file, epoch)
             if f1 > best_val_score:

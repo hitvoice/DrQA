@@ -85,7 +85,7 @@ class StackedBRNN(nn.Module):
         """Slower (significantly), but more precise,
         encoding that handles padding."""
         # Compute sorted sequence lengths
-        lengths = x_mask.data.eq(0).long().sum(1).squeeze()
+        lengths = x_mask.data.eq(0).long().sum(1)
         _, idx_sort = torch.sort(lengths, dim=0, descending=True)
         _, idx_unsort = torch.sort(idx_sort, dim=0)
 
@@ -246,7 +246,7 @@ def uniform_weights(x, x_mask):
     if x.data.is_cuda:
         alpha = alpha.cuda()
     alpha = alpha * x_mask.eq(0).float()
-    alpha = alpha / alpha.sum(1).expand(alpha.size())
+    alpha = alpha / alpha.sum(1, keepdim=True).expand(alpha.size())
     return alpha
 
 
