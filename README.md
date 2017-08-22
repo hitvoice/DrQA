@@ -1,12 +1,11 @@
 DrQA
 ---
-A note at the beginning:
 > Facebook has finally released its official implementation of the paper half a month after this project emerged. This project will stick to its original purpose: it will provide a **clean and minimized** implementation of the paper, so one can quickly read through the code to understand the model, easily make some modifications to test new ideas, or plug the necessary parts into a larger framework. If you plan to deploy this model in a more industrial environment, please refer to [facebookresearch/DrQA](https://github.com/facebookresearch/DrQA). If you would like to embed this model in a chatbot framework, please refer to [facebookresearch/ParlAI](https://github.com/facebookresearch/ParlAI/).
 
 
 A pytorch implementation of the ACL 2017 paper [Reading Wikipedia to Answer Open-Domain Questions](http://www-cs.stanford.edu/people/danqi/papers/acl2017.pdf) (DrQA).
 
-Reading comprehension is a task to produce an answer when given a question and one or more pieces of evidence (usually natural language paragraphs). Compared to question answering over knowledge bases, reading comprehension models are more flexible and have revealed a great potential for zero-shot learning (e.g. [Zero-Shot Relation Extraction via Reading Comprehension](https://arxiv.org/abs/1706.04115)).
+Reading comprehension is a task to produce an answer when given a question and one or more pieces of evidence (usually natural language paragraphs). Compared to question answering over knowledge bases, reading comprehension models are more flexible and have revealed a great potential for zero-shot learning.
 
 [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) is a reading comprehension benchmark where there's only a single piece of evidence and the answer is guaranteed to be a part of the evidence. Since the publication of SQuAD dataset, there has been fast progress in the research of reading comprehension and a bunch of great models have come out. DrQA is one that is conceptually simpler than most others but still yields strong performance even as a single model.
 
@@ -110,7 +109,7 @@ Compared to what's described in the original paper:
 Compared to the code in ParlAI:
 - The DrQA model is not longer wrapped in a chatbot framework, which makes the code more readable, easier to modify and is faster to train. The preprocessing for text corpus is performed only once, while in a dialog framework raw text is transmitted each time and preprocessing for the same text must be done again and again.
 - This is a full implementation of the original paper, while the model in ParlAI is a partial implementation, missing all grammatical features (lemma, POS tags and named entity tags). 
-- When tuning top-k embeddings, the model will tune the embeddings of top-k question words as the original paper states, while the word dictionary in ParlAI is sorted by the frequency of all words. This does make a difference (see the discussion below).
+- When tuning top-k embeddings, the model will tune the embeddings of top-k question words as the original paper states, while the word dictionary in ParlAI is sorted by the frequency of all words. This does make a difference (see the discussion above).
 - Some minor bug fixes and enhancements. Some of them have been merged into ParlAI.
 
 Compared to the code in facebookresearch/DrQA:
