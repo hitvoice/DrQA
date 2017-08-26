@@ -117,6 +117,7 @@ log.addHandler(ch)
 
 def main():
     log.info('[program starts.]')
+    log.info(vars(args))
     train, dev, dev_y, embedding, opt = load_data(vars(args))
     log.info('[Data loaded.]')
 

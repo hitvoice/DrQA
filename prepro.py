@@ -9,6 +9,7 @@ import argparse
 import collections
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
+from drqa.utils import str2bool
 import logging
 
 parser = argparse.ArgumentParser(
@@ -18,7 +19,8 @@ parser.add_argument('--wv_file', default='glove/glove.840B.300d.txt',
                     help='path to word vector file.')
 parser.add_argument('--wv_dim', type=int, default=300,
                     help='word vector dimension.')
-parser.add_argument('--wv_cased', type=bool, default=True,
+parser.add_argument('--wv_cased', type=str2bool, nargs='?',
+                    const=True, default=True,
                     help='treat the words as cased or not.')
 parser.add_argument('--sort_all', action='store_true',
                     help='sort the vocabulary by frequencies of all words. '
@@ -40,6 +42,7 @@ logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG,
                     datefmt='%m/%d/%Y %I:%M:%S')
 log = logging.getLogger(__name__)
 
+log.info(vars(args))
 log.info('start data preparing...')
 
 
