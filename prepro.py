@@ -62,7 +62,7 @@ def load_wv_vocab(file):
         set: a set of tokens (str) contained in the word vector file.
     '''
     vocab = set()
-    with open(file) as f:
+    with open(file, encoding="utf-8") as f:
         for line in f:
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))  # a token may contain space
