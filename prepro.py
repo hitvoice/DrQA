@@ -16,21 +16,14 @@ import sys
 from tqdm import tqdm
 import mmap
 
-#https://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python/850962#850962
 #https://stackoverflow.com/questions/4995733/how-to-create-a-spinning-command-line-cursor-using-python/22616059#22616059
 
 spinner = itertools.cycle(['-', '/', '|', '\\'])
 
-def get_num_lines(file_path):
-    fp = open(file_path, "r+")
-    buf = mmap.mmap(fp.fileno(), 0)
-    lines = 0
-    while buf.readline():
-        lines += 1
-        sys.stdout.write(next(spinner))  # write the next character
-        sys.stdout.flush()                # flush stdout buffer (actual character display)
-        sys.stdout.write('\b')            # erase the last written char
-    return lines
+def display_loading_indicator():
+    sys.stdout.write(next(spinner))
+    sys.stdout.flush()
+    sys.stdout.write('\b')
 
 parser = argparse.ArgumentParser(
     description='Preprocessing data files, about 10 minitues to run.'
@@ -81,11 +74,11 @@ def load_wv_vocab(file):
     Returns:
         set: a set of tokens (str) contained in the word vector file.
     '''
+    print("Load tokens from word vector file...")
     vocab = set()
     with open(file, encoding="utf-8") as f:
-        print('Getting number of lines from wv_file...')
-        total_number_of_lines = get_num_lines(file)
-        for line in tqdm(f, total=total_number_of_lines):
+        for line in f:
+            display_loading_indicator()
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))  # a token may contain space
             vocab.add(token)
@@ -106,10 +99,12 @@ def flatten_json(file, proc_func):
 
 def proc_train(article):
     '''Flatten each article in training data.'''
+    print("Flatten each article in training data...")
     rows = []
     for paragraph in article['paragraphs']:
         context = paragraph['context']
         for qa in paragraph['qas']:
+            display_loading_indicator()
             id_, question, answers = qa['id'], qa['question'], qa['answers']
             answer = answers[0]['text']  # in training data there's only one answer
             answer_start = answers[0]['answer_start']
@@ -120,10 +115,12 @@ def proc_train(article):
 
 def proc_dev(article):
     '''Flatten each article in dev data'''
+    print("Flatten each article in dev data...")
     rows = []
     for paragraph in article['paragraphs']:
         context = paragraph['context']
         for qa in paragraph['qas']:
+            display_loading_indicator()
             id_, question, answers = qa['id'], qa['question'], qa['answers']
             answers = [a['text'] for a in answers]
             rows.append((id_, context, question, answers))
@@ -280,7 +277,9 @@ def build_embedding(embed_file, targ_vocab, dim_vec):
     vocab_size = len(targ_vocab)
     emb = np.zeros((vocab_size, dim_vec))
     w2id = {w: i for i, w in enumerate(targ_vocab)}
+    print("Build embedding...")
     with open(embed_file) as f:
+        display_loading_indicator()
         for line in f:
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))
