@@ -11,6 +11,10 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from drqa.utils import str2bool
 import logging
+from tqdm import tqdm
+
+#https://stackoverflow.com/questions/22029562/python-how-to-make-simple-animated-loading-while-process-is-running/22029635#22029635
+
 
 parser = argparse.ArgumentParser(
     description='Preprocessing data files, about 10 minitues to run.'
@@ -62,15 +66,16 @@ def load_wv_vocab(file):
         set: a set of tokens (str) contained in the word vector file.
     '''
     vocab = set()
-    with open(file) as f:
+    with open(file, encoding="utf-8") as f:
         for line in f:
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))  # a token may contain space
             vocab.add(token)
     return vocab
-wv_vocab = load_wv_vocab(wv_file)
-log.info('glove loaded.')
 
+wv_vocab = load_wv_vocab(wv_file)
+print()
+log.info('glove loaded.')
 
 def flatten_json(file, proc_func):
     '''A multi-processing wrapper for loading SQuAD data file.'''
@@ -106,6 +111,7 @@ def proc_dev(article):
             answers = [a['text'] for a in answers]
             rows.append((id_, context, question, answers))
     return rows
+
 train = flatten_json(trn_file, proc_train)
 train = pd.DataFrame(train,
                      columns=['id', 'context', 'question', 'answer',
@@ -113,10 +119,10 @@ train = pd.DataFrame(train,
 dev = flatten_json(dev_file, proc_dev)
 dev = pd.DataFrame(dev,
                    columns=['id', 'context', 'question', 'answers'])
+print()
 log.info('json data flattened.')
 
 nlp = spacy.load('en', parser=False, tagger=False, entity=False)
-
 
 def pre_proc(text):
     '''normalize spaces in a string.'''
@@ -125,8 +131,9 @@ def pre_proc(text):
 context_iter = (pre_proc(c) for c in train.context)
 context_tokens = [[w.text for w in doc] for doc in nlp.pipe(
     context_iter, batch_size=args.batch_size, n_threads=args.threads)]
-log.info('got intial tokens.')
 
+print()
+log.info('got initial tokens.')
 
 def get_answer_index(context, context_token, answer_start, answer_end):
     '''
@@ -162,12 +169,14 @@ def get_answer_index(context, context_token, answer_start, answer_end):
                 return (None, None)
         p_token += 1
     return (None, None)
+
 train['answer_start_token'], train['answer_end_token'] = \
     zip(*[get_answer_index(a, b, c, d) for a, b, c, d in
           zip(train.context, context_tokens,
               train.answer_start, train.answer_end)])
 initial_len = len(train)
 train.dropna(inplace=True)
+print()
 log.info('drop {} inconsistent samples.'.format(initial_len - len(train)))
 log.info('answer pointer generated.')
 
@@ -191,7 +200,8 @@ context_token_span = [[(w.idx, w.idx + len(w.text)) for w in doc] for doc in con
 context_tags = [[w.tag_ for w in doc] for doc in context_docs]
 context_ents = [[w.ent_type_ for w in doc] for doc in context_docs]
 context_features = []
-for question, context in zip(question_docs, context_docs):
+#for question, context in zip(question_docs, context_docs):
+for question, context in zip(tqdm(question_docs), context_docs):
     question_word = {w.text for w in question}
     question_lower = {w.text.lower() for w in question}
     question_lemma = {w.lemma_ if w.lemma_ != '-PRON-' else w.text.lower() for w in question}
@@ -199,8 +209,8 @@ for question, context in zip(question_docs, context_docs):
     match_lower = [w.text.lower() in question_lower for w in context]
     match_lemma = [(w.lemma_ if w.lemma_ != '-PRON-' else w.text.lower()) in question_lemma for w in context]
     context_features.append(list(zip(match_origin, match_lower, match_lemma)))
+print()
 log.info('tokens generated')
-
 
 def build_vocab(questions, contexts):
     '''
@@ -230,6 +240,7 @@ def token2id(docs, vocab, unk_id=None):
     w2id = {w: i for i, w in enumerate(vocab)}
     ids = [[w2id[w] if w in w2id else unk_id for w in doc] for doc in docs]
     return ids
+
 vocab, counter = build_vocab(question_tokens, context_tokens)
 # tokens
 question_ids = token2id(question_tokens, vocab, unk_id=1)
@@ -253,19 +264,21 @@ log.info('Found {} entity tags: {}'.format(len(vocab_ent), vocab_ent))
 context_ent_ids = token2id(context_ents, vocab_ent)
 log.info('vocab built.')
 
-
 def build_embedding(embed_file, targ_vocab, dim_vec):
     vocab_size = len(targ_vocab)
     emb = np.zeros((vocab_size, dim_vec))
     w2id = {w: i for i, w in enumerate(targ_vocab)}
-    with open(embed_file) as f:
+    with open(embed_file, encoding="utf-8") as f:
         for line in f:
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))
             if token in w2id:
                 emb[w2id[token]] = [float(v) for v in elems[-wv_dim:]]
     return emb
+
+
 embedding = build_embedding(wv_file, vocab, wv_dim)
+print()
 log.info('got embedding matrix.')
 
 train.to_csv('SQuAD/train.csv', index=False)
@@ -315,3 +328,5 @@ if args.sample_size:
     with open('SQuAD/sample.msgpack', 'wb') as f:
         msgpack.dump(sample, f)
 log.info('saved to disk.')
+
+done = True
