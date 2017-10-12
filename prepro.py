@@ -11,6 +11,26 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from drqa.utils import str2bool
 import logging
+import itertools
+import sys
+from tqdm import tqdm
+import mmap
+
+#https://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python/850962#850962
+#https://stackoverflow.com/questions/4995733/how-to-create-a-spinning-command-line-cursor-using-python/22616059#22616059
+
+spinner = itertools.cycle(['-', '/', '|', '\\'])
+
+def get_num_lines(file_path):
+    fp = open(file_path, "r+")
+    buf = mmap.mmap(fp.fileno(), 0)
+    lines = 0
+    while buf.readline():
+        lines += 1
+        sys.stdout.write(next(spinner))  # write the next character
+        sys.stdout.flush()                # flush stdout buffer (actual character display)
+        sys.stdout.write('\b')            # erase the last written char
+    return lines
 
 parser = argparse.ArgumentParser(
     description='Preprocessing data files, about 10 minitues to run.'
@@ -63,7 +83,9 @@ def load_wv_vocab(file):
     '''
     vocab = set()
     with open(file, encoding="utf-8") as f:
-        for line in f:
+        print('Getting number of lines from wv_file...')
+        total_number_of_lines = get_num_lines(file)
+        for line in tqdm(f, total=total_number_of_lines):
             elems = line.split()
             token = normalize_text(''.join(elems[0:-wv_dim]))  # a token may contain space
             vocab.add(token)
