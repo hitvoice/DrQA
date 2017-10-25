@@ -43,9 +43,9 @@ python train.py -e 40 -bs 32
 
 Compared with the official implementation:
 
-<img src="https://rawgit.com/hitvoice/DrQA/master/img/em.svg" width="500">
+<img src="img/em.svg" width="500">
 
-<img src="https://rawgit.com/hitvoice/DrQA/master/img/f1.svg" width="500">
+<img src="img/f1.svg" width="500">
 
 ### Detailed Comparisons
 
