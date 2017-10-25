@@ -10,7 +10,6 @@ from datetime import datetime
 from collections import Counter
 import torch
 import msgpack
-import pandas as pd
 from drqa.model import DocReaderModel
 from drqa.utils import str2bool
 
@@ -30,13 +29,13 @@ parser.add_argument('--save_last_only', action='store_true',
                     help='only save the final models.')
 parser.add_argument('--eval_per_epoch', type=int, default=1,
                     help='perform evaluation per x epochs.')
-parser.add_argument('--seed', type=int, default=411,
+parser.add_argument('--seed', type=int, default=1013,
                     help='random seed for data shuffling, dropout, etc.')
 parser.add_argument("--cuda", type=str2bool, nargs='?',
                     const=True, default=torch.cuda.is_available(),
                     help='whether to use GPU acceleration.')
 # training
-parser.add_argument('-e', '--epochs', type=int, default=20)
+parser.add_argument('-e', '--epochs', type=int, default=40)
 parser.add_argument('-bs', '--batch_size', type=int, default=32)
 parser.add_argument('-rs', '--resume', default='',
                     help='previous model file name (in `model_dir`). '
@@ -67,21 +66,13 @@ parser.add_argument('--hidden_size', type=int, default=128)
 parser.add_argument('--num_features', type=int, default=4)
 parser.add_argument('--pos', type=str2bool, nargs='?', const=True, default=True,
                     help='use pos tags as a feature.')
-parser.add_argument('--pos_size', type=int, default=56,
-                    help='how many kinds of POS tags.')
-parser.add_argument('--pos_dim', type=int, default=12,
-                    help='the embedding dimension for POS tags.')
 parser.add_argument('--ner', type=str2bool, nargs='?', const=True, default=True,
                     help='use named entity tags as a feature.')
-parser.add_argument('--ner_size', type=int, default=19,
-                    help='how many kinds of named entity tags.')
-parser.add_argument('--ner_dim', type=int, default=8,
-                    help='the embedding dimension for named entity tags.')
 parser.add_argument('--use_qemb', type=str2bool, nargs='?', const=True, default=True)
 parser.add_argument('--concat_rnn_layers', type=str2bool, nargs='?',
                     const=True, default=True)
-parser.add_argument('--dropout_emb', type=float, default=0.3)
-parser.add_argument('--dropout_rnn', type=float, default=0.3)
+parser.add_argument('--dropout_emb', type=float, default=0.4)
+parser.add_argument('--dropout_rnn', type=float, default=0.4)
 parser.add_argument('--dropout_rnn_output', type=str2bool, nargs='?',
                     const=True, default=True)
 parser.add_argument('--max_len', type=int, default=15)
@@ -117,8 +108,8 @@ log.addHandler(ch)
 
 def main():
     log.info('[program starts.]')
-    log.info(vars(args))
     train, dev, dev_y, embedding, opt = load_data(vars(args))
+    log.info(opt)
     log.info('[Data loaded.]')
 
     if args.resume:
@@ -152,15 +143,15 @@ def main():
         best_val_score = 0.0
 
     for epoch in range(epoch_0, epoch_0 + args.epochs):
-        log.warn('Epoch {}'.format(epoch))
+        log.warning('Epoch {}'.format(epoch))
         # train
         batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
         start = datetime.now()
         for i, batch in enumerate(batches):
             model.update(batch)
             if i % args.log_per_updates == 0:
-                log.info('updates[{0:6}] train loss[{1:.5f}] remaining[{2}]'.format(
-                    model.updates, model.train_loss.avg,
+                log.info('epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
+                    epoch, model.updates, model.train_loss.avg,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
         # eval
         if epoch % args.eval_per_epoch == 0:
@@ -169,7 +160,7 @@ def main():
             for batch in batches:
                 predictions.extend(model.predict(batch))
             em, f1 = score(predictions, dev_y)
-            log.warn("dev EM: {} F1: {}".format(em, f1))
+            log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
             model_file = os.path.join(model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
@@ -196,44 +187,24 @@ def load_data(opt):
     opt['pretrained_words'] = True
     opt['vocab_size'] = embedding.size(0)
     opt['embedding_dim'] = embedding.size(1)
-    if not opt['fix_embeddings']:
-        embedding[1] = torch.normal(means=torch.zeros(opt['embedding_dim']), std=1.)
+    opt['pos_size'] = len(meta['vocab_tag'])
+    opt['ner_size'] = len(meta['vocab_ent'])
     with open(args.data_file, 'rb') as f:
         data = msgpack.load(f, encoding='utf8')
-    train_orig = pd.read_csv('SQuAD/train.csv')
-    dev_orig = pd.read_csv('SQuAD/dev.csv')
-    train = list(zip(
-        data['trn_context_ids'],
-        data['trn_context_features'],
-        data['trn_context_tags'],
-        data['trn_context_ents'],
-        data['trn_question_ids'],
-        train_orig['answer_start_token'].tolist(),
-        train_orig['answer_end_token'].tolist(),
-        data['trn_context_text'],
-        data['trn_context_spans']
-    ))
-    dev = list(zip(
-        data['dev_context_ids'],
-        data['dev_context_features'],
-        data['dev_context_tags'],
-        data['dev_context_ents'],
-        data['dev_question_ids'],
-        data['dev_context_text'],
-        data['dev_context_spans']
-    ))
-    dev_y = dev_orig['answers'].tolist()[:len(dev)]
-    dev_y = [eval(y) for y in dev_y]
+    train = data['train']
+    data['dev'].sort(key=lambda x: len(x[1]))
+    dev = [x[:-1] for x in data['dev']]
+    dev_y = [x[-1] for x in data['dev']]
     return train, dev, dev_y, embedding, opt
 
 
 class BatchGen:
     def __init__(self, data, batch_size, gpu, evaluation=False):
-        '''
+        """
         input:
             data - list of lists
             batch_size - int
-        '''
+        """
         self.batch_size = batch_size
         self.eval = evaluation
         self.gpu = gpu
@@ -255,40 +226,44 @@ class BatchGen:
             batch_size = len(batch)
             batch = list(zip(*batch))
             if self.eval:
-                assert len(batch) == 7
+                assert len(batch) == 8
             else:
-                assert len(batch) == 9
+                assert len(batch) == 10
 
-            context_len = max(len(x) for x in batch[0])
+            context_len = max(len(x) for x in batch[1])
             context_id = torch.LongTensor(batch_size, context_len).fill_(0)
-            for i, doc in enumerate(batch[0]):
+            for i, doc in enumerate(batch[1]):
                 context_id[i, :len(doc)] = torch.LongTensor(doc)
 
-            feature_len = len(batch[1][0][0])
+            feature_len = len(batch[2][0][0])
+
             context_feature = torch.Tensor(batch_size, context_len, feature_len).fill_(0)
-            for i, doc in enumerate(batch[1]):
+            for i, doc in enumerate(batch[2]):
                 for j, feature in enumerate(doc):
                     context_feature[i, j, :] = torch.Tensor(feature)
 
-            context_tag = torch.LongTensor(batch_size, context_len).fill_(0)
-            for i, doc in enumerate(batch[2]):
-                context_tag[i, :len(doc)] = torch.LongTensor(doc)
-
-            context_ent = torch.LongTensor(batch_size, context_len).fill_(0)
+            context_tag = torch.Tensor(batch_size, context_len, args.pos_size).fill_(0)
             for i, doc in enumerate(batch[3]):
-                context_ent[i, :len(doc)] = torch.LongTensor(doc)
-            question_len = max(len(x) for x in batch[4])
-            question_id = torch.LongTensor(batch_size, question_len).fill_(0)
+                for j, tag in enumerate(doc):
+                    context_tag[i, j, tag] = 1
+
+            context_ent = torch.Tensor(batch_size, context_len, args.ner_size).fill_(0)
             for i, doc in enumerate(batch[4]):
+                for j, ent in enumerate(doc):
+                    context_ent[i, j, ent] = 1
+
+            question_len = max(len(x) for x in batch[5])
+            question_id = torch.LongTensor(batch_size, question_len).fill_(0)
+            for i, doc in enumerate(batch[5]):
                 question_id[i, :len(doc)] = torch.LongTensor(doc)
 
             context_mask = torch.eq(context_id, 0)
             question_mask = torch.eq(question_id, 0)
+            text = list(batch[6])
+            span = list(batch[7])
             if not self.eval:
-                y_s = torch.LongTensor(batch[5])
-                y_e = torch.LongTensor(batch[6])
-            text = list(batch[-2])
-            span = list(batch[-1])
+                y_s = torch.LongTensor(batch[8])
+                y_e = torch.LongTensor(batch[9])
             if self.gpu:
                 context_id = context_id.pin_memory()
                 context_feature = context_feature.pin_memory()
@@ -360,6 +335,7 @@ def score(pred, truth):
     em = 100. * em / total
     f1 = 100. * f1 / total
     return em, f1
+
 
 if __name__ == '__main__':
     main()

@@ -26,7 +26,7 @@ class RnnDocReader(nn.Module):
             self.embedding = nn.Embedding(embedding.size(0),
                                           embedding.size(1),
                                           padding_idx=padding_idx)
-            self.embedding.weight.data = embedding
+            self.embedding.weight.data[2:, :] = embedding[2:, :]
             if opt['fix_embeddings']:
                 assert opt['tune_partial'] == 0
                 for p in self.embedding.parameters():
@@ -40,10 +40,6 @@ class RnnDocReader(nn.Module):
             self.embedding = nn.Embedding(opt['vocab_size'],
                                           opt['embedding_dim'],
                                           padding_idx=padding_idx)
-        if opt['pos']:
-            self.pos_embedding = nn.Embedding(opt['pos_size'], opt['pos_dim'])
-        if opt['ner']:
-            self.ner_embedding = nn.Embedding(opt['ner_size'], opt['ner_dim'])
         # Projection for attention weighted question
         if opt['use_qemb']:
             self.qemb_match = layers.SeqAttnMatch(opt['embedding_dim'])
@@ -53,9 +49,9 @@ class RnnDocReader(nn.Module):
         if opt['use_qemb']:
             doc_input_size += opt['embedding_dim']
         if opt['pos']:
-            doc_input_size += opt['pos_dim']
+            doc_input_size += opt['pos_size']
         if opt['ner']:
-            doc_input_size += opt['ner_dim']
+            doc_input_size += opt['ner_size']
 
         # RNN document encoder
         self.doc_rnn = layers.StackedBRNN(
@@ -131,11 +127,9 @@ class RnnDocReader(nn.Module):
             x2_weighted_emb = self.qemb_match(x1_emb, x2_emb, x2_mask)
             drnn_input_list.append(x2_weighted_emb)
         if self.opt['pos']:
-            x1_pos_emb = self.pos_embedding(x1_pos)
-            drnn_input_list.append(x1_pos_emb)
+            drnn_input_list.append(x1_pos)
         if self.opt['ner']:
-            x1_ner_emb = self.ner_embedding(x1_ner)
-            drnn_input_list.append(x1_ner_emb)
+            drnn_input_list.append(x1_ner)
         drnn_input = torch.cat(drnn_input_list, 2)
         # Encode document with RNN
         doc_hiddens = self.doc_rnn(drnn_input, x1_mask)
