@@ -8,6 +8,7 @@ import argparse
 import collections
 import multiprocessing
 from multiprocessing import Pool
+from tqdm import tqdm
 from drqa.utils import str2bool
 import logging
 
@@ -131,11 +132,9 @@ def index_answer(row):
         return row[:-3] + (None, None)
 
 
-workers = Pool(args.threads, initializer=init)
-train = workers.map(annotate, train)
-dev = workers.map(annotate, dev)
-workers.close()
-workers.join()
+with Pool(args.threads, initializer=init) as p:
+    train = list(tqdm(p.imap(annotate, train, chunksize=args.batch_size), total=len(train), desc='train'))
+    dev = list(tqdm(p.imap(annotate, dev, chunksize=args.batch_size), total=len(dev), desc='dev  '))
 train = list(map(index_answer, train))
 initial_len = len(train)
 train = list(filter(lambda x: x[-1] is not None, train))
