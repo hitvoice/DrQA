@@ -1,0 +1,5 @@
+SQuAD/
+drqa/__pycache__/
+glove/
+models/
+*.log

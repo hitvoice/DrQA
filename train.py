@@ -121,7 +121,10 @@ def main():
         model = DocReaderModel(opt, embedding, state_dict)
         epoch_0 = checkpoint['epoch'] + 1
         for i in range(checkpoint['epoch']):
-            random.shuffle(list(range(len(train))))  # synchronize random seed
+            # synchronize random seed
+            random.setstate(checkpoint['random_state'])
+            torch.random.set_rng_state(checkpoint['torch_state'])
+            torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
         if args.reduce_lr:
             lr_decay(model.optimizer, lr_decay=args.reduce_lr)
     else:
@@ -151,7 +154,7 @@ def main():
             model.update(batch)
             if i % args.log_per_updates == 0:
                 log.info('epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
-                    epoch, model.updates, model.train_loss.avg,
+                    epoch, model.updates, model.train_loss.value,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
         # eval
         if epoch % args.eval_per_epoch == 0:
@@ -339,3 +342,4 @@ def score(pred, truth):
 
 if __name__ == '__main__':
     main()
+

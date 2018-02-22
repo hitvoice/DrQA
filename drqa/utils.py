@@ -1,35 +1,26 @@
-# Copyright (c) 2017-present, Facebook, Inc.
-# All rights reserved.
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree. An additional grant
-# of patent rights can be found in the PATENTS file in the same directory.
 import argparse
 
 
-# Modification: remove unused functions and imports, add a boolean parser.
-# Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
-
-# ------------------------------------------------------------------------------
-# General logging utilities.
-# ------------------------------------------------------------------------------
-
-
 class AverageMeter(object):
-    """Computes and stores the average and current value."""
-    def __init__(self):
-        self.reset()
+    """Keep exponential weighted averages."""
+    def __init__(self, beta=0.99):
+        self.beta = beta
+        self.moment = 0
+        self.value = 0
+        self.t = 0
 
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
+    def state_dict(self):
+        return vars(self)
 
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+    def load(self, state_dict):
+        for k, v in state_dict.items():
+            self.__setattr__(k, v)
+
+    def update(self, val):
+        self.t += 1
+        self.moment = self.beta * self.moment + (1 - self.beta) * val
+        # bias correction
+        self.value = self.moment / (1 - self.beta ** self.t)
 
 
 def str2bool(v):
@@ -39,3 +30,4 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+

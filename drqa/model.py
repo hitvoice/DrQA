@@ -3,6 +3,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
+import random
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -15,7 +16,8 @@ from .rnn_reader import RnnDocReader
 
 # Modification:
 #   - change the logger name
-#   - save & load optimizer state dict
+#   - save & load "state_dict"s of optimizer and loss meter
+#   - save all random seeds
 #   - change the dimension of inputs (for POS and NER features)
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 
@@ -32,6 +34,8 @@ class DocReaderModel(object):
         self.opt = opt
         self.updates = state_dict['updates'] if state_dict else 0
         self.train_loss = AverageMeter()
+        if state_dict:
+            self.train_loss.load(state_dict['loss'])
 
         # Building network.
         self.network = RnnDocReader(opt, embedding=embedding)
@@ -75,7 +79,7 @@ class DocReaderModel(object):
 
         # Compute loss and accuracies
         loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
-        self.train_loss.update(loss.data[0], ex[0].size(0))
+        self.train_loss.update(loss.data[0])
 
         # Clear gradients and run backward
         self.optimizer.zero_grad()
@@ -138,10 +142,14 @@ class DocReaderModel(object):
             'state_dict': {
                 'network': self.network.state_dict(),
                 'optimizer': self.optimizer.state_dict(),
-                'updates': self.updates
+                'updates': self.updates,
+                'loss': self.train_loss.state_dict()
             },
             'config': self.opt,
-            'epoch': epoch
+            'epoch': epoch,
+            'random_state': random.getstate(),
+            'torch_state': torch.random.get_rng_state(),
+            'torch_cuda_state': torch.cuda.get_rng_state()
         }
         try:
             torch.save(params, filename)
@@ -151,3 +159,4 @@ class DocReaderModel(object):
 
     def cuda(self):
         self.network.cuda()
+
