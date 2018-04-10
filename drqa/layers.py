@@ -235,7 +235,7 @@ class LinearSeqAttn(nn.Module):
         x = batch * len * hdim
         x_mask = batch * len
         """
-        x_flat = x.view(-1, x.size(-1))
+        x_flat = x.contiguous().view(-1, x.size(-1))
         scores = self.linear(x_flat).view(x.size(0), x.size(1))
         scores.data.masked_fill_(x_mask.data, -float('inf'))
         alpha = F.softmax(scores, dim=1)
