@@ -47,18 +47,22 @@ class DocReaderModel(object):
             self.network.load_state_dict(state_dict['network'])
 
         # Building optimizer.
+        self.opt_state_dict = state_dict['optimizer'] if state_dict else None
+        self.build_optimizer()
+
+    def build_optimizer(self):
         parameters = [p for p in self.network.parameters() if p.requires_grad]
-        if opt['optimizer'] == 'sgd':
-            self.optimizer = optim.SGD(parameters, opt['learning_rate'],
-                                       momentum=opt['momentum'],
-                                       weight_decay=opt['weight_decay'])
-        elif opt['optimizer'] == 'adamax':
+        if self.opt['optimizer'] == 'sgd':
+            self.optimizer = optim.SGD(parameters, self.opt['learning_rate'],
+                                       momentum=self.opt['momentum'],
+                                       weight_decay=self.opt['weight_decay'])
+        elif self.opt['optimizer'] == 'adamax':
             self.optimizer = optim.Adamax(parameters,
-                                          weight_decay=opt['weight_decay'])
+                                          weight_decay=self.opt['weight_decay'])
         else:
-            raise RuntimeError('Unsupported optimizer: %s' % opt['optimizer'])
-        if state_dict:
-            self.optimizer.load_state_dict(state_dict['optimizer'])
+            raise RuntimeError('Unsupported optimizer: %s' % self.opt['optimizer'])
+        if self.opt_state_dict:
+            self.optimizer.load_state_dict(self.opt_state_dict)
 
     def update(self, ex):
         # Train mode
@@ -79,7 +83,7 @@ class DocReaderModel(object):
 
         # Compute loss and accuracies
         loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
-        self.train_loss.update(loss.data[0])
+        self.train_loss.update(loss.item())
 
         # Clear gradients and run backward
         self.optimizer.zero_grad()
@@ -102,13 +106,13 @@ class DocReaderModel(object):
 
         # Transfer to GPU
         if self.opt['cuda']:
-            inputs = [Variable(e.cuda(async=True), volatile=True)
-                      for e in ex[:7]]
+            inputs = [Variable(e.cuda(async=True)) for e in ex[:7]]
         else:
-            inputs = [Variable(e, volatile=True) for e in ex[:7]]
+            inputs = [Variable(e) for e in ex[:7]]
 
         # Run forward
-        score_s, score_e = self.network(*inputs)
+        with torch.no_grad():
+            score_s, score_e = self.network(*inputs)
 
         # Transfer to CPU/normal tensors for numpy ops
         score_s = score_s.data.cpu()
@@ -155,8 +159,15 @@ class DocReaderModel(object):
             torch.save(params, filename)
             logger.info('model saved to {}'.format(filename))
         except BaseException:
-            logger.warn('[ WARN: Saving failed... continuing anyway. ]')
+            logger.warning('[ WARN: Saving failed... continuing anyway. ]')
 
     def cuda(self):
         self.network.cuda()
+        # we need to rebuild the optimizer according to
+        # https://github.com/pytorch/pytorch/issues/2830#issuecomment-336183179
+        self.build_optimizer()
+        for state in self.optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.cuda()
 
