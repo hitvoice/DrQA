@@ -18,7 +18,11 @@ parser.add_argument("--cuda", type=str2bool, nargs='?',
 args = parser.parse_args()
 
 
-checkpoint = torch.load(args.model_file)
+if args.cuda:
+    checkpoint = torch.load(args.model_file)
+else:
+    checkpoint = torch.load(args.model_file, map_location=lambda storage, loc: storage)
+
 state_dict = checkpoint['state_dict']
 opt = checkpoint['config']
 with open('SQuAD/meta.msgpack', 'rb') as f:
