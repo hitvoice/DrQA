@@ -10,7 +10,7 @@ The motivation for this project is to offer a clean version of DrQA for the mach
 
 ## Requirements
 - python >=3.5 
-- pytorch 0.4 (need to be built from source currently). Historical versions:
+- pytorch 0.4. Historical versions:
   - [DrQA with pytorch 0.3](https://github.com/hitvoice/DrQA/tree/4ad445276373173d7f5845352a4fff910bf1239e)
   - [DrQA with pytorch 0.2](https://github.com/hitvoice/DrQA/tree/303bbfe43fe51d4e437aaeeecf734a8f9922d83e)
 - numpy

@@ -19,6 +19,7 @@ from .rnn_reader import RnnDocReader
 #   - save & load "state_dict"s of optimizer and loss meter
 #   - save all random seeds
 #   - change the dimension of inputs (for POS and NER features)
+#   - remove "reset parameters" and use a gradient hook for gradient masking
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class DocReaderModel(object):
     def __init__(self, opt, embedding=None, state_dict=None):
         # Book-keeping.
         self.opt = opt
+        self.device = torch.cuda.current_device() if opt['cuda'] else torch.device('cpu')
         self.updates = state_dict['updates'] if state_dict else 0
         self.train_loss = AverageMeter()
         if state_dict:
@@ -45,6 +47,7 @@ class DocReaderModel(object):
                 if k not in new_state:
                     del state_dict['network'][k]
             self.network.load_state_dict(state_dict['network'])
+        self.network.to(self.device)
 
         # Building optimizer.
         self.opt_state_dict = state_dict['optimizer'] if state_dict else None
@@ -69,14 +72,9 @@ class DocReaderModel(object):
         self.network.train()
 
         # Transfer to GPU
-        if self.opt['cuda']:
-            inputs = [Variable(e.cuda(async=True)) for e in ex[:7]]
-            target_s = Variable(ex[7].cuda(async=True))
-            target_e = Variable(ex[8].cuda(async=True))
-        else:
-            inputs = [Variable(e) for e in ex[:7]]
-            target_s = Variable(ex[7])
-            target_e = Variable(ex[8])
+        inputs = [e.to(self.device) for e in ex[:7]]
+        target_s = ex[7].to(self.device)
+        target_e = ex[8].to(self.device)
 
         # Run forward
         score_s, score_e = self.network(*inputs)
@@ -90,15 +88,12 @@ class DocReaderModel(object):
         loss.backward()
 
         # Clip gradients
-        torch.nn.utils.clip_grad_norm(self.network.parameters(),
+        torch.nn.utils.clip_grad_norm_(self.network.parameters(),
                                       self.opt['grad_clipping'])
 
         # Update parameters
         self.optimizer.step()
         self.updates += 1
-
-        # Reset any partially fixed parameters (e.g. rare words)
-        self.reset_parameters()
 
     def predict(self, ex):
         # Eval mode
@@ -133,15 +128,8 @@ class DocReaderModel(object):
 
         return predictions
 
-    def reset_parameters(self):
-        # Reset fixed embeddings to original value
-        if self.opt['tune_partial'] > 0:
-            offset = self.opt['tune_partial'] + 2
-            if offset < self.network.embedding.weight.data.size(0):
-                self.network.embedding.weight.data[offset:] \
-                    = self.network.fixed_embedding
-
-    def save(self, filename, epoch):
+    def save(self, filename, epoch, scores):
+        em, f1, best_eval = scores
         params = {
             'state_dict': {
                 'network': self.network.state_dict(),
@@ -151,6 +139,9 @@ class DocReaderModel(object):
             },
             'config': self.opt,
             'epoch': epoch,
+            'em': em,
+            'f1': f1,
+            'best_eval': best_eval,
             'random_state': random.getstate(),
             'torch_state': torch.random.get_rng_state(),
             'torch_cuda_state': torch.cuda.get_rng_state()
@@ -160,14 +151,3 @@ class DocReaderModel(object):
             logger.info('model saved to {}'.format(filename))
         except BaseException:
             logger.warning('[ WARN: Saving failed... continuing anyway. ]')
-
-    def cuda(self):
-        self.network.cuda()
-        # we need to rebuild the optimizer according to
-        # https://github.com/pytorch/pytorch/issues/2830#issuecomment-336183179
-        self.build_optimizer()
-        for state in self.optimizer.state.values():
-            for k, v in state.items():
-                if torch.is_tensor(v):
-                    state[k] = v.cuda()
-

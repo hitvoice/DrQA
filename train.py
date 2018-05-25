@@ -1,6 +1,7 @@
 import re
 import os
 import sys
+import math
 import random
 import string
 import logging
@@ -37,14 +38,6 @@ def main():
         if args.reduce_lr:
             lr_decay(model.optimizer, lr_decay=args.reduce_lr)
             log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
-    else:
-        model = DocReaderModel(opt, embedding)
-        epoch_0 = 1
-
-    if args.cuda:
-        model.cuda()
-
-    if args.resume:
         batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
         predictions = []
         for i, batch in enumerate(batches):
@@ -52,8 +45,14 @@ def main():
             log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
         em, f1 = score(predictions, dev_y)
         log.info("[dev EM: {} F1: {}]".format(em, f1))
-        best_val_score = f1
+        if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
+            log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
+            log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
+            exit(1)
+        best_val_score = checkpoint['best_eval']
     else:
+        model = DocReaderModel(opt, embedding)
+        epoch_0 = 1
         best_val_score = 0.0
 
     for epoch in range(epoch_0, epoch_0 + args.epochs):
@@ -67,19 +66,19 @@ def main():
                 log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
                     epoch, model.updates, model.train_loss.value,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
+        log.debug('\n')
         # eval
-        if epoch % args.eval_per_epoch == 0:
-            batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
-            predictions = []
-            for i, batch in enumerate(batches):
-                predictions.extend(model.predict(batch))
-                log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
-            em, f1 = score(predictions, dev_y)
-            log.warning("dev EM: {} F1: {}".format(em, f1))
+        batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
+        predictions = []
+        for i, batch in enumerate(batches):
+            predictions.extend(model.predict(batch))
+            log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
+        em, f1 = score(predictions, dev_y)
+        log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
             model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
-            model.save(model_file, epoch)
+            model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
                 copyfile(
@@ -93,8 +92,6 @@ def setup():
         description='Train a Document Reader model.'
     )
     # system
-    parser.add_argument('--log_file', default='output.log',
-                        help='path for log file.')
     parser.add_argument('--log_per_updates', type=int, default=3,
                         help='log model loss per x updates (mini-batches).')
     parser.add_argument('--data_file', default='SQuAD/data.msgpack',
@@ -103,8 +100,6 @@ def setup():
                         help='path to store saved models.')
     parser.add_argument('--save_last_only', action='store_true',
                         help='only save the final models.')
-    parser.add_argument('--eval_per_epoch', type=int, default=1,
-                        help='perform evaluation per x epochs.')
     parser.add_argument('--seed', type=int, default=1013,
                         help='random seed for data shuffling, dropout, etc.')
     parser.add_argument("--cuda", type=str2bool, nargs='?',
@@ -176,23 +171,18 @@ def setup():
     class ProgressHandler(logging.Handler):
         def __init__(self, level=logging.NOTSET):
             super().__init__(level)
-            self.is_overwrite = False
 
         def emit(self, record):
             log_entry = self.format(record)
             if record.message.startswith('> '):
                 sys.stdout.write('{}\r'.format(log_entry.rstrip()))
                 sys.stdout.flush()
-                self.is_overwrite = True
             else:
-                if self.is_overwrite:
-                    sys.stdout.write('\n')
-                    self.is_overwrite = False
                 sys.stdout.write('{}\n'.format(log_entry))
 
     log = logging.getLogger(__name__)
     log.setLevel(logging.DEBUG)
-    fh = logging.FileHandler(args.log_file)
+    fh = logging.FileHandler(os.path.join(args.model_dir, 'log.txt'))
     fh.setLevel(logging.INFO)
     ch = ProgressHandler()
     ch.setLevel(logging.DEBUG)
@@ -245,13 +235,15 @@ class BatchGen:
         self.eval = evaluation
         self.gpu = gpu
 
-        # shuffle
-        if not evaluation:
-            indices = list(range(len(data)))
-            random.shuffle(indices)
-            data = [data[i] for i in indices]
+        # sort by len
+        data = sorted(data, key=lambda x: len(x[1]))
         # chunk into batches
         data = [data[i:i + batch_size] for i in range(0, len(data), batch_size)]
+
+        # shuffle
+        if not evaluation:
+            random.shuffle(data)
+
         self.data = data
 
     def __len__(self):

@@ -7,7 +7,9 @@ import torch
 import torch.nn as nn
 from . import layers
 
-# Modification: add 'pos' and 'ner' features.
+# Modification:
+#   - add 'pos' and 'ner' features.
+#   - use gradient hook (instead of tensor copying) for gradient masking
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 
 
@@ -23,19 +25,20 @@ class RnnDocReader(nn.Module):
         # Word embeddings
         if opt['pretrained_words']:
             assert embedding is not None
-            self.embedding = nn.Embedding(embedding.size(0),
-                                          embedding.size(1),
-                                          padding_idx=padding_idx)
-            self.embedding.weight.data[2:, :] = embedding[2:, :]
+            self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
             if opt['fix_embeddings']:
                 assert opt['tune_partial'] == 0
-                for p in self.embedding.parameters():
-                    p.requires_grad = False
+                self.embedding.weight.requires_grad = False
             elif opt['tune_partial'] > 0:
                 assert opt['tune_partial'] + 2 < embedding.size(0)
-                fixed_embedding = embedding[opt['tune_partial'] + 2:]
-                self.register_buffer('fixed_embedding', fixed_embedding)
-                self.fixed_embedding = fixed_embedding
+                offset = self.opt['tune_partial'] + 2
+
+                def embedding_hook(grad, offset=offset):
+                    grad[offset:] = 0
+                    return grad
+
+                self.embedding.weight.register_hook(embedding_hook)
+
         else:  # random initialized
             self.embedding = nn.Embedding(opt['vocab_size'],
                                           opt['embedding_dim'],
