@@ -52,9 +52,10 @@ Time: 0.0214s
 
 Evidence: Beanie style with simple design. So cool to wear and make you different. It wears as peak cap and a fashion cap. It is good to match your clothes well during party and holiday, also makes you charming and fashion, leisure and fashion in public and streets. It suits all adults, for men or women. Matches well with your winter outfits so you stay warm all winter long.
 Question: Is it for women?
-Answer: It suits all adults
+Answer: It suits all adults, for men or women
 Time: 0.0238s
 ```
+The last example is a randomly picked product description from Amazon (not in SQuAD).
 
 ## Results
 ### EM & F1

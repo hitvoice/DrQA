@@ -7,6 +7,13 @@ from drqa.utils import str2bool
 from prepro import annotate, to_id, init
 from train import BatchGen
 
+"""
+This script serves as a template to be modified to suit all possible testing environments, including and not limited 
+to files (json, xml, csv, ...), web service, databases and so on.
+To change this script to batch model, simply modify line 70 from "BatchGen([model_in], batch_size=1, ...)" to 
+"BatchGen([model_in_1, model_in_2, ...], batch_size=batch_size, ...)".
+"""
+
 parser = argparse.ArgumentParser(
     description='Interact with document reader model.'
 )
@@ -37,8 +44,6 @@ opt['cuda'] = args.cuda
 BatchGen.pos_size = opt['pos_size']
 BatchGen.ner_size = opt['ner_size']
 model = DocReaderModel(opt, embedding, state_dict)
-if args.cuda:
-    model.cuda()
 w2id = {w: i for i, w in enumerate(meta['vocab'])}
 tag2id = {w: i for i, w in enumerate(meta['vocab_tag'])}
 ent2id = {w: i for i, w in enumerate(meta['vocab_ent'])}
@@ -56,6 +61,7 @@ while True:
             if question.strip():
                 break
     except EOFError:
+        print()
         break
     id_ += 1
     start_time = time.time()
