@@ -33,7 +33,7 @@ python prepro.py
 # train for 40 epochs with batchsize 32
 python train.py -e 40 -bs 32
 ```
-
+> Warning: Running prepro.py takes about 9G memory when using 8 threads. If there's not enough memory on your machine, try reducing the number of threads used by the script, for example, `python prepro.py --threads 2`
 ### Predict
 ```bash
 python interact.py
