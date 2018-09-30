@@ -7,20 +7,17 @@ Dawnbench instructions
 
 2) Install pytorch 0.4.1 w/ CUDA:
 
-    conda install pytorch torchvision cuda92 -c pytorch
+```
+conda install pytorch torchvision cuda92 -c pytorch
+```
 
 Clone git repo:
 
-    git clone https://github.com/brettkoonce/DrQA
-
-Original repo: https://github.com/hitvoice/DrQA.git
-
-Checkout dawn_logging branch:
-
-	cd DrQA
-	git checkout dawn_logging
+    git clone https://github.com/hitvoice/DrQA.git
 
 Follow readme:
+
+    cd DrQA
 
     pip install -r requirements.txt
 
