@@ -21,6 +21,9 @@ def main():
     train, dev, dev_y, embedding, opt = load_data(vars(args))
     log.info(opt)
     log.info('[Data loaded.]')
+    if args.save_dawn_logs:
+        dawn_start = datetime.now()
+        log.info('dawn_entry: epoch\tf1Score\thours')
 
     if args.resume:
         log.info('[loading previous model...]')
@@ -75,6 +78,9 @@ def main():
             log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
         em, f1 = score(predictions, dev_y)
         log.warning("dev EM: {} F1: {}".format(em, f1))
+        if args.save_dawn_logs:
+            time_diff = datetime.now() - dawn_start
+            log.warning("dawn_entry: {}\t{}\t{}".format(epoch, f1/100.0, float(time_diff.total_seconds() / 3600.0)))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
             model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
@@ -100,6 +106,8 @@ def setup():
                         help='path to store saved models.')
     parser.add_argument('--save_last_only', action='store_true',
                         help='only save the final models.')
+    parser.add_argument('--save_dawn_logs', action='store_true',
+                        help='append dawnbench log entries prefixed with dawn_entry:')
     parser.add_argument('--seed', type=int, default=1013,
                         help='random seed for data shuffling, dropout, etc.')
     parser.add_argument("--cuda", type=str2bool, nargs='?',
