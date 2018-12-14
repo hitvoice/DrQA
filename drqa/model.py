@@ -101,7 +101,7 @@ class DocReaderModel(object):
 
         # Transfer to GPU
         if self.opt['cuda']:
-            inputs = [Variable(e.cuda(async=True)) for e in ex[:7]]
+            inputs = [Variable(e.cuda()) for e in ex[:7]]
         else:
             inputs = [Variable(e) for e in ex[:7]]
 
