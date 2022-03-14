@@ -50,5 +50,5 @@ for ((i=0;i<${#URLS[@]};++i)); do
 done
 
 # Download SpaCy English language models
-python3 -m spacy download en
+python3 -m spacy download en_core_web_md
 

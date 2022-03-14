@@ -177,7 +177,7 @@ nlp = None
 def init():
     """initialize spacy in each process"""
     global nlp
-    nlp = spacy.load('en', parser=False)
+    nlp = spacy.load('en_core_web_md')
 
 
 def annotate(row, wv_cased):
